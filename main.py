@@ -116,6 +116,7 @@ class Market(multiprocessing.Process):
     
     def GulfWar(self, signum, frame):
         print("Received SIGUSR1. Outputting data to output1.txt...")
+        self.update_critical_data(0,0,0,50)
         with open('output1.txt', 'w') as f:
             f.write('Data outputted by SIGUSR1')
 
@@ -150,16 +151,18 @@ class Market(multiprocessing.Process):
 		
         print('salut')
         t=External()
-        t.run()
+        t.start()
         threadh1.join()
         threadh2.join()
         threadh3.join()
+        t.join()
+        print("wesha laure")
         while True:
             time.sleep(1)
             pass
     def communicate_with_h1(self):
         self.sock1.send(pickle.dumps(self.price,self.ensoleillement,self.temperature))   #bonne syntaxe à utiliser, même si je ne sais pas pourquoi il y a un problème à la ligne 162
-        [price_given,ensol_given,temp_given]=pickle.loads(self.sock1.recv(10000))
+        (price_given,ensol_given,temp_given)=pickle.loads(self.sock1.recv(10000))
     def communicate_with_h2(self):
         self.sock2.send(pickle.dumps(self.price), pickle.dumps(ensoleillement),pickle.dumps(temperature))
         self.sock2.recv(pickle.loads)
@@ -241,10 +244,13 @@ if __name__=='__main__':
     ensoleillement=multiprocessing.Value('d',0.5)
     upDown=multiprocessing.Value('i',-1)
     duration=multiprocessing.Value('i',5)
+    transactions_lock=threading.Lock()
+
 	
     sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
     
     sock1.bind(('localhost', 10000))
     _, port1 = sock1.getsockname()
@@ -261,15 +267,20 @@ if __name__=='__main__':
     _, port3 = sock3.getsockname()
     sock3.listen()
     conn3, _ = sock3.accept()
+
+
     
     queue=multiprocessing.Queue()
+
+
+
 	
 	
-    m = Market(10,temperature,temp_change,ensoleillement,upDown,duration,conn1,conn2,conn3)
+    m = Market(10,temperature,temp_change,ensoleillement,upDown,duration,sock1,sock2,sock3)
     p=Weather(temperature,temp_change,ensoleillement,upDown,duration)
-    h1=Home(10,8,"always give",conn1,queue)
-    h2=Home(10,8,"always sell",conn2,queue)
-    h3=Home(10,9, "sell if no takers",conn3,queue)
+    h1=Home(10,8,"always give",sock1,queue)
+    h2=Home(10,8,"always sell",sock2,queue)
+    h3=Home(10,9,"sell if no takers",sock3,queue)
     m.start()
     p.start()
     h1.start()
