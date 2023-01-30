@@ -7,6 +7,14 @@ import os
 import socket
 import pickle
 # Create a Python script that simulates an energy-producing and consuming home
+class DataEchange():
+    def __init__(self, pid, quantite,message):
+        self.pid=pid
+        self.quantite =quantite 
+        self.message=message
+
+
+
 class Home(multiprocessing.Process):
     def __init__(self, production_rate, consumption_rate, trade_policy,socket_number, queue):
         self.a=production_rate
@@ -34,56 +42,80 @@ class Home(multiprocessing.Process):
         self.consuption_rate=self.consumption_rate+(22-temperature)*0.5
         
     def trade_energy(self):
-        if self.trade_policy == "always_give":
+        objettemp2=self.queue.recv()
+
+        if self.trade_policy == "always give":
             # give away surplus energy to other homes
             # give consumption_rate/10
-            self.queue.put("Anyone in need ?")
+            echangetemp=DataEchange(0,0,"Anyone in need ?")
+            self.queue.send(echangetemp)
             time.sleep(1)
-            if (self.queue.get()=="Anyone in need ?" and self.surplus<self.production_rate/10):
-                self.queue.put("I am in need, my pid is "+self.getpid())
-            time.sleep(1)
-            if ((self.queue.get())==str.startswith("I am in need, my pid is ") and self.surplus>self.consumption_rate/5):
-                num_string=(self.queue.get()).split("is ")[-1].strip()   #get pid of the process that sent the message
-                num=int(num_string)
-                self.queue.put(num+", here is some energy, "+self.consumption_rate/10)				#mutex lock à mettre ici pour protéger le changement de la valeur surplus
-                self.surplus=self.surplus-self.consumption_rate/10
+            if (objettemp2.message=="Anyone in need ?" and self.surplus<self.production_rate/10):
+                echangetemp=DataEchange(os.getpid(),0,"")
+                self.queue.send(echangetemp)
+                time.sleep(1)
+                if ( self.surplus>self.consumption_rate/5):
+                 #get pid of the process that sent the message
+                    echangetemp=DataEchange(objettemp2,self.consumption_rate/10,"")
+                    self.queue.send(echangetemp)				#mutex lock à mettre ici pour protéger le changement de la valeur surplus
+                    self.surplus=self.surplus-self.consumption_rate/10
             # calls queue to listen for givers (if surplus<production_rate/10)
+                time.sleep(1)
+                if(type(objettemp2)==DataEchange):
+                    if(objettemp2.pid==self.getpid()):
+                        self.cunsumption_rate+=objettemp2.quantite
 				#if no givers use socket to buy
-            pass
-        elif self.trade_policy == "always_sell":
+                time.sleep(1)
+        elif self.trade_policy == "always sell":
             # sell surplus energy to the market
             # sell consumption_rate/10
-            if (self.surplus>self.consumption_rate/5):
-                self.sellToMarket(self.consumption_rate/10)
-            if (self.queue.get()=="Anyone in need ?" and self.surplus<self.production_rate/10):
-                self.queue.put("I am in need, my pid is "+self.getpid())
+            self.sellToMarket(self.consumption_rate/10)
+            if (objettemp2.message=="Anyone in need ?" and self.surplus<self.production_rate/10):
+                echangetemp=DataEchange(os.getpid(),0,"")
+                self.queue.send(echangetemp)
+            time.sleep(1)
+            if(type(objettemp2)==DataEchange):
+                if(objettemp2.pid==self.getpid()):
+                    self.cunsumption_rate+=objettemp2.quantite
+				#if no givers use socket to buy
+            time.sleep(1)
             # does not call queue for takers (as it always sells)
 				#therefore sell using socket
             # calls queue to listen for givers(if surplus<prodution_rate/10)
 				#if no givers use socket to buy
-            pass
-        else: 
-            self.queue.put("Anyone in need ?")
+        elif(self.trade_policy=="sell if no takers"):
+            echangetemp=DataEchange(0,0,"Anyone in need ?")
+            self.queue.send(echangetemp)
             time.sleep(1)
-            if (self.queue.get()=="Anyone in need ?" and self.surplus<self.production_rate/10):
-                self.queue.put("I am in need, my pid is "+self.getpid())
+            if (objettemp2.message=="Anyone in need ?" and self.surplus<self.production_rate/10):
+                echangetemp=DataEchange(os.getpid(),0,"")
+                self.queue.send(echangetemp)
                 time.sleep(1)
-            if ((self.queue.get())==str.startswith("I am in need, my pid is ") and self.surplus>self.consumption_rate/5):
-                num_string=(self.queue.get()).split("is ")[-1].strip()   #get pid of the process that sent the message
-                num=int(num_string)
-                self.queue.put(num+", here is some energy, "+self.consumption_rate/10)
-            else :
-                self.sellToMarket(self.consumption_rate/10)
+                if ( self.surplus>self.consumption_rate/5):
+                 #get pid of the process that sent the message
+                    echangetemp=DataEchange(objettemp2,self.consumption_rate/10,"")
+                    self.queue.send(echangetemp)				#mutex lock à mettre ici pour protéger le changement de la valeur surplus
+                    self.surplus=self.surplus-self.consumption_rate/10
+            # calls queue to listen for givers (if surplus<production_rate/10)
+                time.sleep(1)
+                if(type(objettemp2)==DataEchange):
+                    if(objettemp2.pid==self.getpid()):
+                        self.cunsumption_rate+=objettemp2.quantite
+				#if no givers use socket to buy
+                time.sleep(1)
+            else:
+                self.sellToMarket(self.consumption_rate/10) 
+
             # if not, sell to the market
             # trade consumption_rate/10
             # calls queue to ask for takers (if no takers sell)
 				#therefore sell using socket
             # calls queue to listen for givers (if surplus<production_rate/10)
-				#if no givers use socket to buy
-                pass
+				#if no givers use socket to boy
             
     def sellToMarket(amountSold):
 		#sells some energy to the market
+        print(amountSold)
         pass
 
     def run(self):
